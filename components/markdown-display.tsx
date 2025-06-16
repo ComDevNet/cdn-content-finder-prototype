@@ -17,8 +17,8 @@ const customComponents: Components = {
   ol: ({node, ...props}) => <ol className="list-decimal pl-6 mb-4 space-y-1 text-foreground/90" {...props} />,
   li: ({node, ...props}) => <li className="mb-1" {...props} />,
   blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-primary pl-4 italic text-muted-foreground my-4" {...props} />,
-  code: ({node, inline, className, children, ...props}) => {
-    const match = /language-(\w+)/.exec(className || '')
+  code: ({inline, className, children, ...props}: React.HTMLAttributes<HTMLElement> & {inline?: boolean}) => {
+    const match = /language-(\w+)/.exec(className || '');
     return !inline && match ? (
       <pre className="font-code bg-muted p-3 rounded-md overflow-x-auto text-sm my-4 shadow-sm">
         <code className={className} {...props}>
@@ -29,7 +29,7 @@ const customComponents: Components = {
       <code className="font-code bg-muted/70 text-accent-foreground px-1.5 py-0.5 rounded-md text-sm" {...props}>
         {children}
       </code>
-    )
+    );
   },
   table: ({node, ...props}) => <table className="min-w-full border-collapse border border-border my-4 text-sm shadow-sm" {...props} />,
   thead: ({node, ...props}) => <thead className="bg-secondary/50" {...props} />,
