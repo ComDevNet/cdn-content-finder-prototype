@@ -3,7 +3,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: "CDN Content Aggregator",
+  title: "CDN Content finder",
   description: 'Aggregate content from the web using AI.',
 };
 
