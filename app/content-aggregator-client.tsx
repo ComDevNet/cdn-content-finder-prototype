@@ -25,6 +25,7 @@ import MarkdownDisplay from '@/components/markdown-display';
 import PdfDownloadButton from '@/components/pdf-download-button';
 import JsonDownloadButton from '@/components/json-download-button';
 import MarkdownDownloadButton from '@/components/markdown-download-button';
+import ImageDownloadButton from '@/components/image-download-button';
 
 const formSchema = z.object({
   prompt: z.string().min(5, { message: "Prompt must be at least 5 characters." }).max(200, {message: "Prompt must be at most 200 characters."}),
@@ -35,7 +36,7 @@ type FormValues = z.infer<typeof formSchema>;
 
 const audienceLevels = [
   { value: "Elementary School", label: "Elementary School Student" },
-  { value: "Middle School", label: "Middle School Student" },
+  { value: "Middle School", label: "Middle School Student" }, 
   { value: "Junior High School", label: "Junior High School Student" },
   { value: "High School", label: "High School Student" },
   { value: "Undergraduate", label: "Undergraduate Student" },
@@ -397,20 +398,26 @@ export default function ContentAggregatorClient() {
             {generatedImageUrl && !isGeneratingImage && (
               <div className="mt-6 p-4 border border-border rounded-lg bg-background shadow-sm flex flex-col items-center">
                 <h3 className="text-xl font-headline font-semibold mb-3 text-primary/80">Generated Image</h3>
-                <img 
-                  src={generatedImageUrl} 
-                  alt={`AI generated image for: ${currentPrompt}`} 
-                  className="max-w-full h-auto rounded-md shadow-md"
-                  style={{maxHeight: '400px'}}
-                  data-ai-hint={generateAiHintFromPrompt(currentPrompt)}
-                />
+                <div className="relative group">
+                  <img 
+                    src={generatedImageUrl} 
+                    alt={`AI generated image for: ${currentPrompt}`} 
+                    className="max-w-full h-auto rounded-md shadow-md"
+                    style={{maxHeight: '400px'}}
+                    data-ai-hint={generateAiHintFromPrompt(currentPrompt)}
+                  />
+                  <ImageDownloadButton 
+                    imageDataUri={generatedImageUrl}
+                    fileName={`ai-image-${(currentPrompt || 'prompt').replace(/[^\w\s]/gi, '').replace(/\s+/g, '-').toLowerCase().substring(0,30)}.png`}
+                  />
+                </div>
               </div>
             )}
             {!generatedImageUrl && isGeneratingImage && (
                <div className="mt-6 p-4 border border-border rounded-lg bg-background shadow-sm flex flex-col items-center">
                   <h3 className="text-xl font-headline font-semibold mb-3 text-primary/80">Generating Image...</h3>
                   <img 
-                      src={`https://placehold.co/1200x1080.png`} 
+                      src={`https://placehold.co/1920x1080.png`} 
                       alt="Placeholder for AI generated image" 
                       className="max-w-full h-auto rounded-md shadow-md opacity-50"
                       style={{maxHeight: '400px'}}
