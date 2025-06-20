@@ -382,7 +382,7 @@ export default function ContentAggregatorClient() {
                         {generatedImageUrl ? "Regenerate Image" : "Generate Image"}
                     </Button>
                 )}
-                 {/* {output.content && (
+                 {output.content && (
                     <Button 
                         onClick={onGrammarCheck} 
                         disabled={anyOperationInProgress}
@@ -392,7 +392,7 @@ export default function ContentAggregatorClient() {
                         {isCheckingGrammar ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckSquare className="mr-2 h-5 w-5" />}
                         Check Grammar
                     </Button>
-                )} */}
+                )}
             </div>
             
             {/* Image Display Area */}
