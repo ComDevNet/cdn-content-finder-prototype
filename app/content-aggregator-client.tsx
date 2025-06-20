@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2, FileText, RefreshCw } from 'lucide-react';
+import { Loader2, FileText, RefreshCw, Image as ImageIcon, CheckSquare } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,15 +13,19 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from '@/hooks/use-toast';
 
-import type { GatherRelevantContentInput, GatherRelevantContentOutput } from '@/ai/flows/gather-relevant-content';
+import type { GatherRelevantContentOutput } from '@/ai/flows/gather-relevant-content';
 import type { ContinueContentInput } from '@/ai/flows/continue-content-flow';
-import { handleGatherContent, handleContinueContent } from './actions';
+import type { GenerateImageInput } from '@/ai/flows/generate-image-flow';
+import type { GrammarCheckOutput, GrammarCheckInput } from '@/ai/flows/grammar-check-flow';
+import { handleGatherContent, handleContinueContent, handleGenerateImage, handleGrammarCheck } from './actions';
 import MarkdownDisplay from '@/components/markdown-display';
 import PdfDownloadButton from '@/components/pdf-download-button';
 import JsonDownloadButton from '@/components/json-download-button';
 import MarkdownDownloadButton from '@/components/markdown-download-button';
+import ImageDownloadButton from '@/components/image-download-button';
 import Image from 'next/image';
 
 const formSchema = z.object({
@@ -33,7 +37,7 @@ type FormValues = z.infer<typeof formSchema>;
 
 const audienceLevels = [
   { value: "Elementary School", label: "Elementary School Student" },
-  { value: "Middle School", label: "Middle School Student" },
+  { value: "Middle School", label: "Middle School Student" }, 
   { value: "Junior High School", label: "Junior High School Student" },
   { value: "High School", label: "High School Student" },
   { value: "Undergraduate", label: "Undergraduate Student" },
@@ -43,12 +47,22 @@ const audienceLevels = [
   { value: "Expert", label: "Expert (Academic Research)" },
 ];
 
+const generateAiHintFromPrompt = (prompt: string): string => {
+  if (!prompt) return "image";
+  return prompt.toLowerCase().split(/\s+/).slice(0, 2).join(' ').replace(/[^\w\s]/gi, '');
+};
+
 export default function ContentAggregatorClient() {
   const [isLoading, setIsLoading] = useState(false);
   const [isContinuing, setIsContinuing] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [isCheckingGrammar, setIsCheckingGrammar] = useState(false);
   const [output, setOutput] = useState<GatherRelevantContentOutput | null>(null);
+  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
+  const [grammarSuggestions, setGrammarSuggestions] = useState<GrammarCheckOutput['suggestions'] | null>(null);
   const [currentPrompt, setCurrentPrompt] = useState<string>("");
   const [currentAudienceLevel, setCurrentAudienceLevel] = useState<string>("");
+  
 
   const { toast } = useToast();
 
@@ -62,20 +76,24 @@ export default function ContentAggregatorClient() {
 
   useEffect(() => {
     const subscription = form.watch((value, { name, type }) => {
-      if (output && (name === 'prompt' || name === 'audienceLevel')) {
-        setOutput(null); 
+      if (name === 'prompt' || name === 'audienceLevel') {
+        if (output) setOutput(null); 
+        if (generatedImageUrl) setGeneratedImageUrl(null);
+        if (grammarSuggestions) setGrammarSuggestions(null);
       }
     });
     return () => subscription.unsubscribe();
-  }, [form, output]);
+  }, [form, output, generatedImageUrl, grammarSuggestions]);
 
   async function onSubmit(values: FormValues) {
     setIsLoading(true);
     setOutput(null);
+    setGeneratedImageUrl(null);
+    setGrammarSuggestions(null);
     setCurrentPrompt(values.prompt);
     setCurrentAudienceLevel(values.audienceLevel);
 
-    const input: GatherRelevantContentInput = { 
+    const input = { 
       prompt: values.prompt,
       audienceLevel: values.audienceLevel,
     };
@@ -89,10 +107,9 @@ export default function ContentAggregatorClient() {
         title: "Error Gathering Content",
         description: result.error, 
       });
-      console.error("Full error from handleGatherContent:", result.error);
     } else {
       setOutput(result);
-      if (result.content) {
+      if (result.content && result.content !== "After reviewing potential sources, none were deemed sufficiently relevant or authoritative to construct a textbook-quality chapter on this specific topic for the specified audience, based on the provided snippets. Please try a different or more specific prompt, or ensure the search tool can access a wider range of academic sources.") {
         toast({
           title: "Success",
           description: "Content gathered successfully!",
@@ -101,7 +118,7 @@ export default function ContentAggregatorClient() {
          toast({
           variant: "default",
           title: "No Content Found",
-          description: "Could not find relevant content for your prompt and audience. Try being more specific or changing the audience level.",
+          description: result.content, 
         });
       }
     }
@@ -118,6 +135,7 @@ export default function ContentAggregatorClient() {
     }
 
     setIsContinuing(true);
+    setGrammarSuggestions(null); // Clear old grammar suggestions
 
     const input: ContinueContentInput = {
       originalPrompt: currentPrompt,
@@ -135,12 +153,10 @@ export default function ContentAggregatorClient() {
         title: "Error Continuing Generation",
         description: result.error,
       });
-      console.error("Full error from handleContinueContent:", result.error);
     } else {
       setOutput(prevOutput => ({
         ...prevOutput!,
         content: (prevOutput!.content || "") + "\n\n" + result.continuedContent,
-        // Preserve original sources, do not overwrite with empty if continuedContent doesn't return sources
         sources: prevOutput!.sources 
       }));
       toast({
@@ -150,10 +166,80 @@ export default function ContentAggregatorClient() {
     }
   }
 
+  async function onGenerateImage() {
+    if (!currentPrompt) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Cannot generate image without an initial prompt for context.",
+      });
+      return;
+    }
+    setIsGeneratingImage(true);
+    setGeneratedImageUrl(null); 
+
+    const input: GenerateImageInput = { prompt: currentPrompt };
+    const result = await handleGenerateImage(input);
+    setIsGeneratingImage(false);
+
+    if ('error' in result) {
+      toast({
+        variant: "destructive",
+        title: "Error Generating Image",
+        description: result.error,
+      });
+    } else {
+      setGeneratedImageUrl(result.imageDataUri);
+      toast({
+        title: "Image Generated",
+        description: "An image has been generated for your content.",
+      });
+    }
+  }
+
+  async function onGrammarCheck() {
+    if (!output || !output.content) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No content available to check grammar.",
+      });
+      return;
+    }
+    setIsCheckingGrammar(true);
+    setGrammarSuggestions(null);
+
+    const input: GrammarCheckInput = { textToCheck: output.content };
+    const result = await handleGrammarCheck(input);
+    setIsCheckingGrammar(false);
+
+    if ('error' in result) {
+      toast({
+        variant: "destructive",
+        title: "Error Checking Grammar",
+        description: result.error,
+      });
+    } else {
+      setGrammarSuggestions(result.suggestions);
+      if (result.suggestions.length > 0) {
+        toast({
+          title: "Grammar Check Complete",
+          description: `Found ${result.suggestions.length} potential issue(s).`,
+        });
+      } else {
+        toast({
+          title: "Grammar Check Complete",
+          description: "No grammatical issues found!",
+        });
+      }
+    }
+  }
+
+  const anyOperationInProgress = isLoading || isContinuing || isGeneratingImage || isCheckingGrammar;
 
   return (
     <>
-    <Card className="w-full max-w-3xl mx-auto shadow-xl bg-card rounded-xl mt-25">
+    <Card className="w-full max-w-3xl mx-auto shadow-xl bg-card rounded-xl">
       <CardHeader className="pb-4">
         <div className="flex items-center space-x-4">
           <div className="p-3 bg-primary/10 rounded-lg">
@@ -227,11 +313,11 @@ export default function ContentAggregatorClient() {
               )}
             />
             
-            <Button type="submit" disabled={isLoading || isContinuing} className="w-full sm:w-auto text-base py-3 px-6 rounded-lg h-12 text-primary-foreground hover:bg-primary/90 transition-all duration-300 ease-in-out transform hover:scale-105 focus:ring-4 focus:ring-primary/50">
+            <Button type="submit" disabled={anyOperationInProgress} className="w-full sm:w-auto text-base py-3 px-6 rounded-lg h-12 text-primary-foreground hover:bg-primary/90 transition-all duration-300 ease-in-out transform hover:scale-105 focus:ring-4 focus:ring-primary/50">
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Gathering Initial Content...
+                  Gathering Content...
                 </>
               ) : (
                 "Start Gathering"
@@ -240,11 +326,14 @@ export default function ContentAggregatorClient() {
           </form>
         </Form>
 
-        {(isLoading || isContinuing) && (
+        {(isLoading || isContinuing || isGeneratingImage || isCheckingGrammar) && (
           <div className="mt-8 flex flex-col items-center justify-center text-center p-6 bg-secondary/30 rounded-lg shadow-inner animate-pulse">
             <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
             <p className="text-lg font-semibold text-foreground">
-              {isLoading ? "Processing your initial request..." : "Generating more content..."}
+              {isLoading && "Processing your initial request..."}
+              {isContinuing && "Generating more content..."}
+              {isGeneratingImage && "Generating your image..."}
+              {isCheckingGrammar && "Checking grammar and style..."}
             </p>
             <p className="text-muted-foreground">This might take a few moments. Please wait.</p>
           </div>
@@ -259,12 +348,13 @@ export default function ContentAggregatorClient() {
                 <MarkdownDisplay content={output.content} />
               </div>
             </div>
-            
-            {output.content && !isContinuing && (
-                 <div className="flex justify-center pt-4">
+
+            {/* Action Buttons Area */}
+            <div className="flex flex-wrap justify-center gap-4 pt-4">
+                {output.content && !isContinuing && (
                     <Button 
                         onClick={onContinueGeneration} 
-                        disabled={isContinuing} 
+                        disabled={anyOperationInProgress} 
                         variant="outline"
                         className="text-base py-3 px-6 rounded-lg h-12 border-accent text-accent hover:bg-accent/10 hover:text-accent transition-all duration-300 ease-in-out transform hover:scale-105 focus:ring-4 focus:ring-accent/30"
                     >
@@ -280,8 +370,91 @@ export default function ContentAggregatorClient() {
                         </>
                         )}
                     </Button>
-                 </div>
+                )}
+                {output.content && (
+                    <Button 
+                        onClick={onGenerateImage} 
+                        disabled={anyOperationInProgress}
+                        variant="outline"
+                        className="text-base py-3 px-6 rounded-lg h-12 border-accent text-accent hover:bg-accent/10 hover:text-accent transition-all duration-300 ease-in-out transform hover:scale-105 focus:ring-4 focus:ring-accent/30"
+                    >
+                        {isGeneratingImage ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : (generatedImageUrl ? <RefreshCw className="mr-2 h-5 w-5" /> : <ImageIcon className="mr-2 h-5 w-5" />)}
+                        {generatedImageUrl ? "Regenerate Image" : "Generate Image"}
+                    </Button>
+                )}
+                 {/* {output.content && (
+                    <Button 
+                        onClick={onGrammarCheck} 
+                        disabled={anyOperationInProgress}
+                        variant="outline"
+                        className="text-base py-3 px-6 rounded-lg h-12 border-accent text-accent hover:bg-accent/10 hover:text-accent transition-all duration-300 ease-in-out transform hover:scale-105 focus:ring-4 focus:ring-accent/30"
+                    >
+                        {isCheckingGrammar ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckSquare className="mr-2 h-5 w-5" />}
+                        Check Grammar
+                    </Button>
+                )} */}
+            </div>
+            
+            {/* Image Display Area */}
+            {generatedImageUrl && !isGeneratingImage && (
+              <div className="mt-6 p-4 border border-border rounded-lg bg-background shadow-sm flex flex-col items-center">
+                <h3 className="text-xl font-headline font-semibold mb-3 text-primary/80">Generated Image</h3>
+                <div className="relative group">
+                  <img 
+                    src={generatedImageUrl} 
+                    alt={`AI generated image for: ${currentPrompt}`} 
+                    className="max-w-full h-auto rounded-md shadow-md"
+                    style={{maxHeight: '400px'}}
+                    data-ai-hint={generateAiHintFromPrompt(currentPrompt)}
+                  />
+                  <ImageDownloadButton 
+                    imageDataUri={generatedImageUrl}
+                    fileName={`ai-image-${(currentPrompt || 'prompt').replace(/[^\w\s]/gi, '').replace(/\s+/g, '-').toLowerCase().substring(0,30)}.png`}
+                  />
+                </div>
+              </div>
             )}
+            {!generatedImageUrl && isGeneratingImage && (
+               <div className="mt-6 p-4 border border-border rounded-lg bg-background shadow-sm flex flex-col items-center">
+                  <h3 className="text-xl font-headline font-semibold mb-3 text-primary/80">Generating Image...</h3>
+                  <img 
+                      src={`https://placehold.co/1920x1080.png`} 
+                      alt="Placeholder for AI generated image" 
+                      className="max-w-full h-auto rounded-md shadow-md opacity-50"
+                      style={{maxHeight: '400px'}}
+                      data-ai-hint={generateAiHintFromPrompt(currentPrompt)}
+                  />
+               </div>
+             )}
+
+            {/* Grammar Suggestions Area */}
+            {grammarSuggestions && !isCheckingGrammar && (
+              <div className="mt-8 space-y-4">
+                <Separator />
+                <h2 className="text-2xl font-headline font-semibold text-primary">Grammar & Style Suggestions</h2>
+                {grammarSuggestions.length > 0 ? (
+                  <Accordion type="single" collapsible className="w-full">
+                    {grammarSuggestions.map((item, index) => (
+                      <AccordionItem value={`item-${index}`} key={index}>
+                        <AccordionTrigger className="text-left hover:no-underline">
+                            <div className="flex flex-col">
+                                <span className="font-semibold text-primary/90">{item.issue}</span>
+                                <span className="text-sm text-muted-foreground italic">Original: "{item.problematicText}"</span>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <p className="mb-1"><strong className="text-foreground">Suggestion:</strong> {item.suggestion}</p>
+                          {item.explanation && <p className="text-sm text-muted-foreground"><strong className="text-foreground/80">Explanation:</strong> {item.explanation}</p>}
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                ) : (
+                  <p className="text-muted-foreground">No specific grammar or style issues found by the AI.</p>
+                )}
+              </div>
+            )}
+
           </div>
         )}
       </CardContent>
@@ -310,3 +483,4 @@ export default function ContentAggregatorClient() {
     </>
   );
 }
+    
