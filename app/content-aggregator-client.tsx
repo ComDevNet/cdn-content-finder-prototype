@@ -26,6 +26,7 @@ import PdfDownloadButton from '@/components/pdf-download-button';
 import JsonDownloadButton from '@/components/json-download-button';
 import MarkdownDownloadButton from '@/components/markdown-download-button';
 import ImageDownloadButton from '@/components/image-download-button';
+import Image from 'next/image';
 
 const formSchema = z.object({
   prompt: z.string().min(5, { message: "Prompt must be at least 5 characters." }).max(200, {message: "Prompt must be at most 200 characters."}),
@@ -241,8 +242,8 @@ export default function ContentAggregatorClient() {
     <Card className="w-full max-w-3xl mx-auto shadow-xl bg-card rounded-xl">
       <CardHeader className="pb-4">
         <div className="flex items-center space-x-4">
-          <div className="p-3 bg-primary/10 rounded-lg">
-            <FileText className="h-8 w-8 text-primary" />
+            <div className="p-3 bg-primary/10 rounded-lg">
+          <Image src={"/CDN-logo-stroked-transparent.png"} alt="CDN Icon" width={48} height={48}/>
           </div>
           <div>
             <CardTitle className="text-3xl font-headline text-primary">CDN Content Finder</CardTitle>
