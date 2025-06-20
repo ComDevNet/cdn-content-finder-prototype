@@ -242,7 +242,7 @@ export default function ContentAggregatorClient() {
     <Card className="w-full max-w-3xl mx-auto shadow-xl bg-card rounded-xl">
       <CardHeader className="pb-4">
         <div className="flex items-center space-x-4">
-            <div className="p-3 bg-primary/10 rounded-lg">
+          <div className="p-3 bg-primary/10 rounded-lg">
           <Image src={"/CDN-logo-stroked-transparent.png"} alt="CDN Icon" width={48} height={48}/>
           </div>
           <div>
