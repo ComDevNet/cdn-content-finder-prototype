@@ -1,4 +1,4 @@
-# CDN Content Finder
+# CDN Content Finder (Prototype)
 
 This is a web application built with Next.js that leverages the power of generative AI to function as an intelligent content aggregator. Users can input a topic and specify a target audience, and the application will gather relevant information, generate a comprehensive text, create an accompanying image, and allow the content to be exported in multiple formats.
 
