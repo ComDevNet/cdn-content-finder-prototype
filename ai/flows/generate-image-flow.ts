@@ -18,8 +18,8 @@ export type GenerateImageInput = z.infer<typeof GenerateImageInputSchema>;
 
 const GenerateImageOutputSchema = z.object({
   imageDataUri: z.string().url().describe('The generated image as a data URI.'),
-  // We include a text field because gemini-2.0-flash-exp requires responseModalities: ['TEXT', 'IMAGE']
-  // and will always return some text, even if it's just "OK" or similar.
+  // We include a text field because the image generation model requires responseModalities: ['TEXT', 'IMAGE']
+  // and will always return some text.
   accompanyingText: z.string().optional().describe('Any accompanying text returned by the model.'),
 });
 export type GenerateImageOutput = z.infer<typeof GenerateImageOutputSchema>;
@@ -37,11 +37,12 @@ const generateImageFlow = ai.defineFlow(
   async (input: GenerateImageInput) => {
     try {
       const {media, text} = await ai.generate({
-        model: 'googleai/gemini-2.0-flash-exp', // MUST be this model for image generation
-        prompt: `Generate a visually appealing and relevant image for the following topic: "${input.prompt}". The image should be suitable as an illustration for educational content. Ensure the image is safe for all audiences the aspect ratio of the image should be 16:9.`,
+        // IMPORTANT: Use the specific model for image generation.
+        model: 'googleai/gemini-2.0-flash-preview-image-generation',
+        prompt: `Generate a high-quality, visually appealing image that is highly relevant to the following topic: "${input.prompt}". The style should be photorealistic or a detailed illustration, suitable for a textbook or educational material. Ensure the image is safe for all audiences and does not contain any text. The image should have an aspect ratio of 16:9.`,
         config: {
           responseModalities: ['TEXT', 'IMAGE'], // MUST provide both
-           safetySettings: [ // Adding general safety settings
+           safetySettings: [ 
             { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
             { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
             { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
