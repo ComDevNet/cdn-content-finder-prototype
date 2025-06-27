@@ -1,6 +1,6 @@
 # CDN Content Finder (Prototype)
 
-This is a web application built with Next.js that leverages the power of generative AI to function as an intelligent content aggregator. Users can input a topic and specify a target audience, and the application will gather relevant information, generate a comprehensive text, create an accompanying image, and allow the content to be exported in multiple formats.
+This is a web application built with Next.js that leverages the power of generative AI to function as an intelligent content aggregator. Users can input a topic and specify a target audience, and the application will gather relevant information, generate a comprehensive text, create an accompanying image, check for grammatical errors, and allow the content to be exported in multiple formats.
 
 ## Tech Stack
 
@@ -16,6 +16,7 @@ This is a web application built with Next.js that leverages the power of generat
 - **AI Content Aggregation**: Gathers and synthesizes information on a given topic, tailored to a specific audience level.
 - **AI Content Continuation**: Extends the initially generated text with new, relevant information.
 - **AI Image Generation**: Creates a unique, high-quality image based on the user's topic.
+- **AI Grammar & Style Check**: Analyzes the generated content and provides suggestions for improvement.
 - **Multiple Export Options**: Download the final content as a styled PDF, a structured JSON, or a clean Markdown file.
 
 ## How It Works: Application Architecture
@@ -26,7 +27,7 @@ The application follows a modern web architecture, separating the client-side us
 
 This is the main user interface component, built using React and ShadCN UI components. It's the central hub for all user interaction.
 
-- **State Management**: It uses React hooks (`useState`) to manage the application's state, including loading indicators for various operations (`isLoading`, `isGeneratingImage`, etc.), the user's input (prompt and audience level), and the final outputs (the aggregated text, the generated image URL).
+- **State Management**: It uses React hooks (`useState`) to manage the application's state, including loading indicators for various operations (`isLoading`, `isGeneratingImage`, etc.), the user's input (prompt and audience level), and the final outputs (the aggregated text, the generated image URL, and grammar suggestions).
 - **Form Handling**: It uses `react-hook-form` with `zod` for schema validation to ensure that user input for the prompt and audience level is valid before any requests are made.
 - **Triggering Actions**: When a user clicks a button (e.g., "Start Gathering," "Generate Image"), the component calls the corresponding asynchronous `handle...` function imported from `app/actions.ts`. It then updates the UI based on the result, showing a loading spinner during the operation and displaying the content, image, or an error message (via a "toast" notification) upon completion.
 
@@ -61,6 +62,11 @@ This is the core of the application's intelligence, powered by Genkit.
   - It takes the user's topic and uses a refined prompt that guides the AI to create a high-quality, relevant illustration suitable for educational material.
   - The image is returned not as a file, but as a **Data URI** (a long string of text representing the image), which can be directly used in the `src` attribute of an `<img>` tag in the browser.
 
+- **`src/ai/flows/grammar-check-flow.ts`**: This flow turns the AI into an expert proofreader.
+
+  - It takes the generated text and uses the `grammarCheckPrompt` to analyze it.
+  - The prompt asks the AI to identify issues and return a structured list (an array of objects) containing the problematic text, a suggestion for correction, and an explanation. This structured output makes it easy to display the results cleanly in the UI.
+
 ### 4. Components (`components/`)
 
 The application uses reusable React components for various UI elements and functionalities. Key components include:
@@ -73,33 +79,33 @@ The application uses reusable React components for various UI elements and funct
 
 1. **Prerequisites**:
 
-    - Node.js and npm installed.
-    - A Google AI API key.
+   - Node.js and npm installed.
+   - A Google AI API key.
 
 2. **Environment Setup**:
 
-    - Create a `.env` file in the root of the project.
-    - Add your Google AI API key to this file:
+   - Create a `.env` file in the root of the project.
+   - Add your Google AI API key to this file:
 
-      ```env
-      GOOGLE_API_KEY=your_api_key_here
-      ```
+     ```env
+     GOOGLE_API_KEY=your_api_key_here
+     ```
 
 3. **Install Dependencies**:
 
-    ```bash
-    bun install
-    ```
+   ```bash
+   bun install
+   ```
 
 4. **Run Development Servers**:
-    You need to run two processes in separate terminals:
+   You need to run two processes in separate terminals:
 
-    - **Next.js Frontend**:
+   - **Next.js Frontend**:
 
-      ```bash
-      bun run dev
-      ```
+     ```bash
+     bun run dev
+     ```
 
-      This will start the web application, usually on `http://localhost:3000`.
+     This will start the web application, usually on `http://localhost:3000`.
 
 Now you can open your browser to the Next.js URL and start using the application.
