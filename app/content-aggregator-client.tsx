@@ -235,6 +235,43 @@ export default function ContentAggregatorClient() {
     }
   }
 
+  function handleApplySuggestion(problematicText: string, suggestion: string) {
+    if (!output || !output.content) {
+      toast({
+        variant: "destructive",
+        title: "Error Applying Change",
+        description: "No content available to modify.",
+      });
+      return;
+    }
+
+    const newContent = output.content.replace(problematicText, suggestion);
+
+    if (newContent === output.content) {
+      toast({
+        variant: "default",
+        title: "Could Not Apply Change",
+        description: "The original text to be replaced was not found. It might have been changed by a previous correction.",
+      });
+    } else {
+      toast({
+        title: "Change Applied",
+        description: "The suggestion has been applied to the main content.",
+      });
+    }
+
+    setOutput(prevOutput => ({
+      ...prevOutput!,
+      content: newContent,
+    }));
+
+    // Remove the applied suggestion from the list to prevent re-applying.
+    // This is safer than filtering by index, especially if the list re-orders.
+    setGrammarSuggestions(prevSuggestions =>
+      prevSuggestions!.filter(s => s.problematicText !== problematicText || s.suggestion !== suggestion)
+    );
+  }
+
   const anyOperationInProgress = isLoading || isContinuing || isGeneratingImage || isCheckingGrammar;
 
   return (
@@ -418,7 +455,7 @@ export default function ContentAggregatorClient() {
                <div className="mt-6 p-4 border border-border rounded-lg bg-background shadow-sm flex flex-col items-center">
                   <h3 className="text-xl font-headline font-semibold mb-3 text-primary/80">Generating Image...</h3>
                   <img 
-                      src={`https://placehold.co/1920x1080.png`} 
+                      src={`https://placehold.co/600x400.png`} 
                       alt="Placeholder for AI generated image" 
                       className="max-w-full h-auto rounded-md shadow-md opacity-50"
                       style={{maxHeight: '400px'}}
@@ -435,7 +472,7 @@ export default function ContentAggregatorClient() {
                 {grammarSuggestions.length > 0 ? (
                   <Accordion type="single" collapsible className="w-full">
                     {grammarSuggestions.map((item, index) => (
-                      <AccordionItem value={`item-${index}`} key={index}>
+                      <AccordionItem value={`item-${index}`} key={`${index}-${item.problematicText}`}>
                         <AccordionTrigger className="text-left hover:no-underline">
                             <div className="flex flex-col">
                                 <span className="font-semibold text-primary/90">{item.issue}</span>
@@ -443,8 +480,18 @@ export default function ContentAggregatorClient() {
                             </div>
                         </AccordionTrigger>
                         <AccordionContent>
-                          <p className="mb-1"><strong className="text-foreground">Suggestion:</strong> {item.suggestion}</p>
-                          {item.explanation && <p className="text-sm text-muted-foreground"><strong className="text-foreground/80">Explanation:</strong> {item.explanation}</p>}
+                          <div className="space-y-3">
+                            <p><strong className="text-foreground">Suggestion:</strong> {item.suggestion}</p>
+                            {item.explanation && <p className="text-sm text-muted-foreground"><strong className="text-foreground/80">Explanation:</strong> {item.explanation}</p>}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleApplySuggestion(item.problematicText, item.suggestion)}
+                              className="mt-2 border-primary text-primary hover:bg-primary/10"
+                            >
+                              Apply Change
+                            </Button>
+                          </div>
                         </AccordionContent>
                       </AccordionItem>
                     ))}
@@ -483,4 +530,3 @@ export default function ContentAggregatorClient() {
     </>
   );
 }
-    
