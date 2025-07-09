@@ -26,6 +26,7 @@ import PdfDownloadButton from '@/components/pdf-download-button';
 import JsonDownloadButton from '@/components/json-download-button';
 import MarkdownDownloadButton from '@/components/markdown-download-button';
 import ImageDownloadButton from '@/components/image-download-button';
+import DocxDownloadButton from '@/components/docx-download-button';
 import Image from 'next/image';
 
 const formSchema = z.object({
@@ -511,6 +512,11 @@ export default function ContentAggregatorClient() {
             content={output.content || ""} 
             prompt={`${currentPrompt || form.getValues("prompt")}`}
             fileName={`cdn-content-${(currentPrompt || form.getValues("prompt")).replace(/[^\w\s]/gi, '').replace(/\s+/g, '-').toLowerCase().substring(0,30)}-${(currentAudienceLevel || form.getValues("audienceLevel")).replace(/\s+/g, '-').toLowerCase()}.pdf`}
+          />
+           <DocxDownloadButton
+            content={output.content || ""}
+            prompt={`${currentPrompt || form.getValues("prompt")}`}
+            fileName={`cdn-content-${(currentPrompt || form.getValues("prompt")).replace(/[^\w\s]/gi, '').replace(/\s+/g, '-').toLowerCase().substring(0,30)}-${(currentAudienceLevel || form.getValues("audienceLevel")).replace(/\s+/g, '-').toLowerCase()}.docx`}
           />
            <JsonDownloadButton
             content={output.content || ""}
