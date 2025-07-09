@@ -455,7 +455,7 @@ export default function ContentAggregatorClient() {
                <div className="mt-6 p-4 border border-border rounded-lg bg-background shadow-sm flex flex-col items-center">
                   <h3 className="text-xl font-headline font-semibold mb-3 text-primary/80">Generating Image...</h3>
                   <img 
-                      src={`https://placehold.co/600x400.png`} 
+                      src={`https://placehold.co/1280x1080.png`} 
                       alt="Placeholder for AI generated image" 
                       className="max-w-full h-auto rounded-md shadow-md opacity-50"
                       style={{maxHeight: '400px'}}
