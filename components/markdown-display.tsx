@@ -4,7 +4,7 @@ import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 interface MarkdownDisplayProps {
-  content: string;
+  content: string; 
 }
 
 const customComponents: Components = {
