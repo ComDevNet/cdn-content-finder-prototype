@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2, FileText, RefreshCw, Image as ImageIcon, CheckSquare, BookOpen } from 'lucide-react';
+import { Loader2, RefreshCw, Image as ImageIcon, CheckSquare, BookOpen, Edit, Save, XSquare } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +29,8 @@ import ImageDownloadButton from '@/components/image-download-button';
 import DocxDownloadButton from '@/components/docx-download-button';
 import SourceList from '@/components/source-list';
 import Image from 'next/image';
+import WysiwygEditor from '@/components/wysiwyg-editor';
+import htmlToMarkdown from '@wcj/html-to-markdown';
 
 const formSchema = z.object({
   prompt: z.string().min(5, { message: "Prompt must be at least 5 characters." }).max(200, {message: "Prompt must be at most 200 characters."}),
@@ -59,7 +61,9 @@ export default function ContentAggregatorClient() {
   const [isContinuing, setIsContinuing] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [isCheckingGrammar, setIsCheckingGrammar] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [output, setOutput] = useState<GatherRelevantContentOutput | null>(null);
+  const [editedContent, setEditedContent] = useState<string>("");
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [grammarSuggestions, setGrammarSuggestions] = useState<GrammarCheckOutput['suggestions'] | null>(null);
   const [currentPrompt, setCurrentPrompt] = useState<string>("");
@@ -82,16 +86,18 @@ export default function ContentAggregatorClient() {
         if (output) setOutput(null); 
         if (generatedImageUrl) setGeneratedImageUrl(null);
         if (grammarSuggestions) setGrammarSuggestions(null);
+        if (isEditing) setIsEditing(false);
       }
     });
     return () => subscription.unsubscribe();
-  }, [form, output, generatedImageUrl, grammarSuggestions]);
+  }, [form, output, generatedImageUrl, grammarSuggestions, isEditing]);
 
   async function onSubmit(values: FormValues) {
     setIsLoading(true);
     setOutput(null);
     setGeneratedImageUrl(null);
     setGrammarSuggestions(null);
+    setIsEditing(false);
     setCurrentPrompt(values.prompt);
     setCurrentAudienceLevel(values.audienceLevel);
 
@@ -138,6 +144,7 @@ export default function ContentAggregatorClient() {
 
     setIsContinuing(true);
     setGrammarSuggestions(null); // Clear old grammar suggestions
+    setIsEditing(false); // Exit edit mode if active
 
     const input: ContinueContentInput = {
       originalPrompt: currentPrompt,
@@ -267,11 +274,30 @@ export default function ContentAggregatorClient() {
       content: newContent,
     }));
 
-    // Remove the applied suggestion from the list to prevent re-applying.
-    // This is safer than filtering by index, especially if the list re-orders.
     setGrammarSuggestions(prevSuggestions =>
       prevSuggestions!.filter(s => s.problematicText !== problematicText || s.suggestion !== suggestion)
     );
+  }
+
+  function handleEdit() {
+    setEditedContent(output?.content || "");
+    setIsEditing(true);
+  }
+
+  async function handleSave() {
+    const markdown = await htmlToMarkdown({html: editedContent});
+    setOutput(prev => prev ? { ...prev, content: markdown } : null);
+    setIsEditing(false);
+    setGrammarSuggestions(null); // Grammar check might be outdated
+    toast({
+        title: "Content Saved",
+        description: "Your changes have been saved.",
+    });
+  }
+
+  function handleCancel() {
+    setEditedContent("");
+    setIsEditing(false);
   }
 
   const anyOperationInProgress = isLoading || isContinuing || isGeneratingImage || isCheckingGrammar;
@@ -381,14 +407,34 @@ export default function ContentAggregatorClient() {
         {output && !isLoading && output.content && (
           <div className="mt-8 space-y-6">
             <Separator />
-            <div>
-              <h2 className="text-2xl font-headline font-semibold mb-4 text-primary">Aggregated Content (for {currentAudienceLevel || form.getValues("audienceLevel")})</h2>
-              <div className="p-4 sm:p-6 border border-border rounded-lg bg-background shadow-sm">
-                <MarkdownDisplay content={output.content} />
-              </div>
+            <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-headline font-semibold text-primary">Aggregated Content (for {currentAudienceLevel || form.getValues("audienceLevel")})</h2>
+                {/* Edit/Save/Cancel Buttons */}
+                <div className="flex gap-2">
+                {isEditing ? (
+                  <>
+                    <Button onClick={handleSave} size="sm" className="bg-green-600 hover:bg-green-700 text-white"><Save className="mr-2 h-4 w-4"/>Save</Button>
+                    <Button onClick={handleCancel} size="sm" variant="destructive"><XSquare className="mr-2 h-4 w-4"/>Cancel</Button>
+                  </>
+                ) : (
+                  <Button onClick={handleEdit} size="sm" variant="outline"><Edit className="mr-2 h-4 w-4"/>Edit</Button>
+                )}
+                </div>
+            </div>
+
+            <div className="p-4 sm:p-6 border border-border rounded-lg bg-background shadow-sm">
+                {isEditing ? (
+                  <WysiwygEditor
+                    content={output.content}
+                    onChange={setEditedContent}
+                   />
+                ) : (
+                  <MarkdownDisplay content={output.content} />
+                )}
             </div>
 
             {/* Action Buttons Area */}
+            {!isEditing && (
             <div className="flex flex-wrap justify-center gap-4 pt-4">
                 {output.content && !isContinuing && (
                     <Button 
@@ -433,6 +479,7 @@ export default function ContentAggregatorClient() {
                     </Button>
                 )}
             </div>
+            )}
             
             {/* Image Display Area */}
             {generatedImageUrl && !isGeneratingImage && (
@@ -467,7 +514,7 @@ export default function ContentAggregatorClient() {
              )}
 
             {/* Grammar Suggestions Area */}
-            {grammarSuggestions && !isCheckingGrammar && (
+            {grammarSuggestions && !isCheckingGrammar && !isEditing && (
               <div className="mt-8 space-y-4">
                 <Separator />
                 <h2 className="text-2xl font-headline font-semibold text-primary">Grammar & Style Suggestions</h2>
