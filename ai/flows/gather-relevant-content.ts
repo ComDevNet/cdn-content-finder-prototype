@@ -19,112 +19,78 @@ const GatherRelevantContentInputSchema = z.object({
 });
 export type GatherRelevantContentInput = z.infer<typeof GatherRelevantContentInputSchema>;
 
-const SearchResultSchema = z.object({
+const SourceSchema = z.object({
   title: z.string().describe('The title of the search result.'),
   url: z.string().url().describe('The URL of the search result.'),
   snippet: z.string().describe('A short snippet from the search result.'),
-  isRelevant: z.boolean().describe('Whether the search result is relevant to the user prompt and audience level.'),
 });
-export type SearchResult = z.infer<typeof SearchResultSchema>;
-
+export type Source = z.infer<typeof SourceSchema>;
 
 const GatherRelevantContentOutputSchema = z.object({
-  results: z.array(SearchResultSchema).describe('An array of relevant search results, including their relevance assessment.'),
   content: z.string().describe('The aggregated content from the relevant search results, tailored for the audience.'),
-  sources: z.array(
-      z.object({
-        title: z.string(),
-        url: z.string().url(),
-        snippet: z.string(),
-      })
-  ).describe('The metadata of the sources used to gather the content (title, URL, snippet).'),
+  sources: z.array(SourceSchema).describe('The metadata of the sources used to gather the content (title, URL, snippet).'),
 });
-
 export type GatherRelevantContentOutput = z.infer<typeof GatherRelevantContentOutputSchema>;
 
-// IMPORTANT: This function currently returns DUMMY data and simulates an internet search.
-// For a production application, you MUST replace this with a real internet search tool.
-// This could involve:
-// 1. Implementing a Genkit tool that calls a search engine API (e.g., Google Custom Search API, Bing Search API, Serper API, etc.).
-// 2. Using a web scraping solution (be mindful of terms of service and ethical considerations).
-// The tool should be designed to fetch and return relevant search results
-// based on the user's prompt. The URLs returned should be actual URLs from the search.
-// The quality and quantity of "gathering all needed resources" heavily depends on this real implementation.
-async function searchInternet(prompt: string): Promise<{
-  title: string;
-  link: string;
-  snippet: string;
-}[]> {
-  console.log(`Simulating internet search for: "${prompt}"`);
-  // Placeholder for internet search functionality.
-  // In a real application, this would use a search engine API.
-  // For now, return some varied dummy data to illustrate.
-  if (prompt.toLowerCase().includes("history of rome")) {
-    return Promise.resolve([
-      {
-        title: 'The Roman Empire: A Brief Overview - History.com',
-        link: 'https://www.history.com/topics/ancient-rome/roman-empire',
-        snippet: 'Explore the rise and fall of the Roman Empire, from its mythical founding to its eventual decline. Key figures, major events, and lasting legacy.',
-      },
-      {
-        title: 'Ancient Rome - Wikipedia',
-        link: 'https://en.wikipedia.org/wiki/Ancient_Rome',
-        snippet: 'Ancient Rome was a civilization that grew from a small agricultural community founded on the Italian Peninsula in the 10th to 8th centuries BC.',
-      },
-      {
-        title: 'Daily Life in Ancient Rome - World History Encyclopedia',
-        link: 'https://www.worldhistory.org/Rome/',
-        snippet: 'Details on housing, food, entertainment, and social structure in ancient Rome, providing a glimpse into the lives of its citizens.',
-      },
-       {
-        title: 'SPQR: A History of Ancient Rome by Mary Beard - Book Review',
-        link: 'https://www.theguardian.com/books/2015/oct/22/spqr-a-history-of-ancient-rome-mary-beard-review',
-        snippet: 'A review of Mary Beard\'s comprehensive history of ancient Rome, highlighting its narrative style and scholarly depth.',
-      },
-    ]);
+
+// Define interfaces for the expected structure of Serper API response
+interface SerperOrganicResult {
+  title?: string;
+  link?: string;
+  snippet?: string;
+  position?: number;
+}
+
+interface SerperResponse {
+  organic?: SerperOrganicResult[];
+}
+
+async function searchInternet(prompt: string): Promise<Source[]> {
+  console.log(`Performing live internet search for: "${prompt}"`);
+  
+  const apiKey = process.env.SERPER_API_KEY;
+  if (!apiKey) {
+    throw new Error("SERPER_API_KEY is not set in the environment variables.");
   }
-  if (prompt.toLowerCase().includes("quantum computing")) {
-    return Promise.resolve([
-      {
-        title: 'Quantum Computing: Principles and Applications - MIT Technology Review',
-        link: 'https://www.technologyreview.com/topics/computing/quantum-computing/',
-        snippet: 'An in-depth exploration of the fundamental principles of quantum computing, its potential applications, and current challenges in the field.',
+
+  try {
+    const response = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-      {
-        title: 'NIST Quantum Information Science Portal',
-        link: 'https://www.nist.gov/quantum-information-science',
-        snippet: 'Official resources from the National Institute of Standards and Technology on quantum algorithms, cryptography, and metrology.',
-      },
-      {
-        title: 'Introduction to Quantum Mechanics - Stanford Encyclopedia of Philosophy',
-        link: 'https://plato.stanford.edu/entries/qm/',
-        snippet: 'A philosophical and theoretical overview of quantum mechanics, the basis for quantum computing.',
-      },
-    ]);
-  }
-  // Generic dummy data for other prompts
-  return Promise.resolve([
-    {
-      title: `Exploring ${prompt}: An Academic Perspective - ResearchGate`,
-      link: `https://www.researchgate.net/publication/fake-doc-id-${prompt.replace(/\s+/g, '_').toLowerCase()}`,
-      snippet: `This paper provides a detailed analysis of ${prompt}, covering its historical context, current understanding, and future implications. Includes peer-reviewed references.`,
-    },
-    {
-      title: `${prompt} in Context: A University Course Reader - OpenStax`,
-      link: `https://openstax.org/books/introductory-${prompt.replace(/\s+/g, '-').toLowerCase()}/pages/introduction`,
-      snippet: `An introductory chapter from an open educational resource on ${prompt}, designed for undergraduate students. Explains fundamental concepts clearly.`,
-    },
-    {
-      title: `Advanced Topics in ${prompt} - Journal of Specialized Studies`,
-      link: `https://www.jstor.org/stable/search?query=${encodeURIComponent(prompt)}`,
-      snippet: `A collection of scholarly articles discussing advanced research and complex theories related to ${prompt}, suitable for postgraduate and expert audiences.`,
-    },
-    {
-      title: `Understanding ${prompt} for Everyone - Khan Academy`,
-      link: `https://www.khanacademy.org/science/tags/${prompt.replace(/\s+/g, '-').toLowerCase()}`,
-      snippet: `Accessible explanations and examples of ${prompt}, aimed at high school students and the general public to foster a basic understanding.`,
+      body: JSON.stringify({ 
+        q: prompt,
+        apiKey: apiKey // Pass API key in the body
+      }),
+    });
+
+    if (!response.ok) {
+       const errorBody = await response.json();
+       console.error("Error fetching search results from Serper:", errorBody);
+       throw new Error(`Serper API request failed with status: ${response.status} - ${errorBody.message || 'Unknown error'}`);
     }
-  ]);
+
+    const data: SerperResponse = await response.json();
+
+    if (data.organic) {
+      return data.organic
+              .filter((res): res is Required<SerperOrganicResult> => !!res.title && !!res.link && !!res.snippet) // Ensure essential fields exist
+              .map((res) => ({
+                title: res.title,
+                url: res.link,
+                snippet: res.snippet,
+              }))
+              .slice(0, 10); // Limit to top 10 results
+    }
+    
+    return [];
+
+  } catch (error) {
+    console.error("Error during Serper API call:", error);
+    // In case of an API error, return an empty array to prevent the flow from crashing.
+    return [];
+  }
 }
 
 export async function gatherRelevantContent(input: GatherRelevantContentInput): Promise<GatherRelevantContentOutput> {
@@ -156,7 +122,7 @@ const summarizeContentPrompt = ai.definePrompt({
     schema: z.object({
       prompt: z.string(),
       audienceLevel: z.string(),
-      results: z.array(SearchResultSchema.omit({ isRelevant: true })), // isRelevant is not needed for summarization
+      results: z.array(SourceSchema),
     }),
   },
   output: {schema: z.object({content: z.string()})},
@@ -193,38 +159,24 @@ const gatherRelevantContentFlow = ai.defineFlow(
   async (input: GatherRelevantContentInput) => {
     const rawSearchResults = await searchInternet(input.prompt);
 
-    const evaluatedResults: SearchResult[] = [];
-    const summarizationInputs: { title: string; url: string; snippet: string }[] = [];
-
+    const relevantSources: Source[] = [];
 
     for (const result of rawSearchResults) {
       const {output: relevanceOutput} = await searchResultRelevancePrompt({
         prompt: input.prompt,
         audienceLevel: input.audienceLevel,
         title: result.title,
-        url: result.link,
+        url: result.url,
         snippet: result.snippet,
       });
-      const isRelevant = relevanceOutput?.isRelevant ?? false;
-      evaluatedResults.push({
-        title: result.title,
-        url: result.link,
-        snippet: result.snippet,
-        isRelevant: isRelevant,
-      });
-      if (isRelevant) {
-        summarizationInputs.push({
-          title: result.title,
-          url: result.link,
-          snippet: result.snippet,
-        });
+      if (relevanceOutput?.isRelevant) {
+        relevantSources.push(result);
       }
     }
 
-    if (summarizationInputs.length === 0) {
+    if (relevantSources.length === 0) {
       return {
-        results: evaluatedResults,
-        content: "After reviewing potential sources, none were deemed sufficiently relevant or authoritative to construct a textbook-quality chapter on this specific topic for the specified audience, based on the provided snippets. Please try a different or more specific prompt, or ensure the search tool can access a wider range of academic sources.",
+        content: "After reviewing potential sources, none were deemed sufficiently relevant or authoritative to construct a textbook-quality chapter on this specific topic for the specified audience, based on the provided snippets. Please try a different or more specific prompt.",
         sources: [], // No sources used for content generation
       };
     }
@@ -232,16 +184,12 @@ const gatherRelevantContentFlow = ai.defineFlow(
     const {output: summaryOutput} = await summarizeContentPrompt({
       prompt: input.prompt,
       audienceLevel: input.audienceLevel,
-      results: summarizationInputs,
+      results: relevantSources,
     });
 
-    // The 'sources' in the output should be the ones actually used for summarization.
-    const usedSourcesForOutput = summarizationInputs.map(s => ({title: s.title, url: s.url, snippet: s.snippet }));
-
     return {
-      results: evaluatedResults, // All evaluated results, including non-relevant ones for transparency
       content: summaryOutput?.content ?? 'Could not generate content based on the provided sources.',
-      sources: usedSourcesForOutput,
+      sources: relevantSources,
     };
   }
 );

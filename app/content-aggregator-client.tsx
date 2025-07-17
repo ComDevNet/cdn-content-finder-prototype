@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2, FileText, RefreshCw, Image as ImageIcon, CheckSquare } from 'lucide-react';
+import { Loader2, FileText, RefreshCw, Image as ImageIcon, CheckSquare, BookOpen } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +27,7 @@ import JsonDownloadButton from '@/components/json-download-button';
 import MarkdownDownloadButton from '@/components/markdown-download-button';
 import ImageDownloadButton from '@/components/image-download-button';
 import DocxDownloadButton from '@/components/docx-download-button';
+import SourceList from '@/components/source-list';
 import Image from 'next/image';
 
 const formSchema = z.object({
@@ -110,7 +111,7 @@ export default function ContentAggregatorClient() {
       });
     } else {
       setOutput(result);
-      if (result.content && result.content !== "After reviewing potential sources, none were deemed sufficiently relevant or authoritative to construct a textbook-quality chapter on this specific topic for the specified audience, based on the provided snippets. Please try a different or more specific prompt, or ensure the search tool can access a wider range of academic sources.") {
+      if (result.content && !result.content.startsWith("After reviewing potential sources")) {
         toast({
           title: "Success",
           description: "Content gathered successfully!",
@@ -502,12 +503,26 @@ export default function ContentAggregatorClient() {
                 )}
               </div>
             )}
+            
+            {/* Sources Display Area */}
+            {output.sources && output.sources.length > 0 && (
+              <div className="mt-8 space-y-4">
+                <Separator />
+                <h2 className="text-2xl font-headline font-semibold text-primary flex items-center">
+                  <BookOpen className="mr-3 h-6 w-6" />
+                  Sources Used
+                </h2>
+                <div className="p-4 border border-border rounded-lg bg-background shadow-sm">
+                  <SourceList sources={output.sources} />
+                </div>
+              </div>
+            )}
 
           </div>
         )}
       </CardContent>
       {output && !isLoading && output.content && (
-        <CardFooter className="flex flex-col sm:flex-row justify-end pt-6 mt-4 border-t border-border space-y-2 sm:space-y-0 sm:space-x-2">
+        <CardFooter className="flex flex-wrap justify-end gap-2 pt-6 mt-4 border-t border-border">
            <PdfDownloadButton 
             content={output.content || ""} 
             prompt={`${currentPrompt || form.getValues("prompt")}`}
