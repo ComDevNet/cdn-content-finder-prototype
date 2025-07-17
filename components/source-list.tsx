@@ -1,9 +1,11 @@
+
 "use client";
 
 import { Link } from 'lucide-react';
+import type { Source } from '@/ai/flows/gather-relevant-content';
 
 interface SourceListProps {
-  sources: string[]; // Now expects an array of URLs
+  sources: Source[];
 }
 
 export default function SourceList({ sources }: SourceListProps) {
@@ -12,21 +14,34 @@ export default function SourceList({ sources }: SourceListProps) {
   }
 
   return (
-    <ul className="space-y-3">
-      {sources.map((sourceUrl, index) => (
-        <li key={index} className="font-code text-sm flex items-start">
-          <Link className="h-4 w-4 text-accent mr-2 mt-0.5 shrink-0" />
-          <a
-            href={sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-accent hover:text-primary hover:underline transition-colors duration-200 break-all"
-            aria-label={`Source ${index + 1}: ${sourceUrl}`}
-          >
-            {sourceUrl}
-          </a>
-        </li>
+    <div className="space-y-4">
+      {sources.map((source, index) => (
+        <div key={index} className="flex items-start">
+          <Link className="h-4 w-4 text-accent mr-3 mt-1 shrink-0" />
+          <div className="flex flex-col">
+            <a
+              href={source.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent hover:text-primary hover:underline transition-colors duration-200 font-semibold"
+              aria-label={`Source ${index + 1}: ${source.title}`}
+            >
+              {source.title}
+            </a>
+            <p className="text-sm text-muted-foreground mt-1">
+              {source.snippet}
+            </p>
+            <a
+              href={source.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-primary/80 hover:underline break-all"
+            >
+              {source.url}
+            </a>
+          </div>
+        </div>
       ))}
-    </ul>
+    </div>
   );
 }
